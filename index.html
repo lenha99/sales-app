@@ -2,15 +2,12 @@
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Sales KPI App</title>
+<title>KPI Dashboard</title>
 
 <style>
-body { font-family: sans-serif; padding:10px; background:#f5f5f5; }
-.card { background:white; padding:12px; margin-bottom:10px; border-radius:12px; box-shadow:0 2px 5px rgba(0,0,0,0.1);}
-h2 { margin-bottom:5px; }
-input { width:70px; padding:5px; margin:2px;}
-button { padding:5px 10px; margin:2px; border-radius:6px; border:none; background:#eee;}
-.result { font-size:14px; margin-top:5px;}
+body { font-family:sans-serif; padding:10px; background:#f5f5f5; }
+.card { background:white; padding:12px; margin-bottom:10px; border-radius:12px; }
+input { width:70px; margin:2px; }
 .green { color:green; font-weight:bold;}
 .yellow { color:orange; font-weight:bold;}
 .red { color:red; font-weight:bold;}
@@ -20,158 +17,106 @@ button { padding:5px 10px; margin:2px; border-radius:6px; border:none; backgroun
 
 <body>
 
-<h2>Sales KPI</h2>
+<h2>KPI Dashboard</h2>
+
+환율 <input id="rate" value="1300"><br><br>
 
 <div id="products"></div>
 
-<h3>📊 Group Result</h3>
-<div id="group"></div>
+<h3>📊 TOTAL</h3>
+<div id="total"></div>
 
 <script>
 
-const products = ["ICD","CRT-D","IPG","CRT-P","ICM"];
+const list = ["ICD","CRT-D","IPG","CRT-P","ICM"];
 
-function save() {
-  let data = {};
-  products.forEach(p=>{
-    data[p] = {
-      asp: getVal(p,"asp"),
-      yearly: getVal(p,"yearly"),
-      actual: getVal(p,"actual")
-    }
-  });
-  localStorage.setItem("salesData", JSON.stringify(data));
-}
-
-function load() {
-  let data = JSON.parse(localStorage.getItem("salesData") || "{}");
-  return data;
-}
-
-function createUI() {
-  let saved = load();
-  let html = "";
-
-  products.forEach(p=>{
-    let d = saved[p] || {asp:1000000, yearly:0, actual:0};
-
-    html += `
+function createUI(){
+  let html="";
+  list.forEach(p=>{
+    html+=`
     <div class="card">
       <div class="big">${p}</div>
 
-      ASP <input type="number" id="${p}_asp" value="${d.asp}">
-      Yearly <input type="number" id="${p}_yearly" value="${d.yearly}">
-      Actual <input type="number" id="${p}_actual" value="${d.actual}">
+      ASP <input id="${p}_asp" value="1000">
+      Yearly <input id="${p}_year" value="0"><br>
 
-      <br>
-      <button onclick="change('${p}',1)">+</button>
-      <button onclick="change('${p}',-1)">-</button>
+      MTD <input id="${p}_mtd" value="0">
+      QTD <input id="${p}_qtd" value="0">
+      YTD <input id="${p}_ytd" value="0"><br>
 
-      <div class="result" id="${p}_result"></div>
+      <div id="${p}_res"></div>
     </div>`;
   });
-
-  document.getElementById("products").innerHTML = html;
+  document.getElementById("products").innerHTML=html;
 }
 
-function getVal(p, type){
-  return +document.getElementById(p+"_"+type).value;
-}
+function val(id){ return +document.getElementById(id).value; }
 
-function change(p, val){
-  let el = document.getElementById(p+"_actual");
-  el.value = Math.max(0, +el.value + val);
-  calculate();
-}
-
-function calc(d){
-  let monthly = d.yearly / 12;
-  let monthly$ = monthly * d.asp;
-  let actual$ = d.actual * d.asp;
-  let ach = monthly>0 ? (d.actual / monthly * 100) : 0;
-
-  return {monthly, monthly$, actual$, ach};
-}
-
-function color(a){
-  if(a>=100) return "green";
-  if(a>=70) return "yellow";
+function color(v){
+  if(v>=100) return "green";
+  if(v>=90) return "yellow";
   return "red";
 }
 
-function calculate(){
+function calc(){
 
-  let data = {};
-  products.forEach(p=>{
-    data[p] = {
-      asp: getVal(p,"asp"),
-      yearly: getVal(p,"yearly"),
-      actual: getVal(p,"actual")
-    }
+  let rate = val("rate");
+
+  let totalY=0, totalTarget=0;
+
+  list.forEach(p=>{
+
+    let asp = val(p+"_asp");
+    let yearly = val(p+"_year");
+    let mtd = val(p+"_mtd");
+    let qtd = val(p+"_qtd");
+    let ytd = val(p+"_ytd");
+
+    let monthTarget = yearly/12;
+    let quarterTarget = yearly/4;
+
+    let mAch = monthTarget? mtd/monthTarget*100:0;
+    let qAch = quarterTarget? qtd/quarterTarget*100:0;
+
+    let yRev = ytd*asp;
+    let yTargetRev = yearly*asp;
+    let yAch = yTargetRev? yRev/yTargetRev*100:0;
+
+    // 분기 남은
+    let remainQ = quarterTarget - qtd;
+
+    // 남은 달 계산 (간단히 1~3)
+    let remainMonth = Math.max(1, 3 - Math.floor(qtd / (quarterTarget/3)));
+
+    let need = remainQ>0? (remainQ/remainMonth):0;
+
+    let over = yRev - yTargetRev;
+
+    document.getElementById(p+"_res").innerHTML=`
+    분기: <span class="${color(qAch)}">${qAch.toFixed(1)}%</span><br>
+    👉 필요: ${need.toFixed(1)} /월<br>
+
+    월: <span class="${color(mAch)}">${mAch.toFixed(1)}%</span><br>
+    연: <span class="${color(yAch)}">${yAch.toFixed(1)}%</span><br>
+
+    💰 초과: ${over>0? "+"+over.toLocaleString():over.toLocaleString()}
+    `;
+
+    totalY += yRev;
+    totalTarget += yTargetRev;
+
   });
 
-  // 제품별 계산
-  products.forEach(p=>{
-    let r = calc(data[p]);
+  let totalAch = totalTarget? totalY/totalTarget*100:0;
 
-    document.getElementById(p+"_result").innerHTML =
-      `Monthly: ${r.monthly.toFixed(1)}<br>
-       Revenue: ${r.actual$.toLocaleString()}<br>
-       Ach: <span class="${color(r.ach)}">${r.ach.toFixed(1)}%</span>`;
-  });
-
-  // 그룹 계산
-  function group(arr){
-    let actual=0, target=0, actual$=0, target$=0;
-
-    arr.forEach(p=>{
-      let d = data[p];
-      let r = calc(d);
-
-      actual += d.actual;
-      target += d.yearly/12;
-      actual$ += r.actual$;
-      target$ += r.monthly$;
-    });
-
-    let ach = target>0 ? actual/target*100 : 0;
-    let ach$ = target$>0 ? actual$/target$*100 : 0;
-
-    return {actual,target,actual$,target$,ach,ach$};
-  }
-
-  let HV = group(["ICD","CRT-D"]);
-  let LV = group(["IPG","CRT-P"]);
-  let ICM = group(["ICM"]);
-
-  document.getElementById("group").innerHTML = `
-  <div class="card">
-    <b>HV</b><br>
-    Qty Ach: <span class="${color(HV.ach)}">${HV.ach.toFixed(1)}%</span><br>
-    Rev Ach: <span class="${color(HV.ach$)}">${HV.ach$.toFixed(1)}%</span>
-  </div>
-
-  <div class="card">
-    <b>LV</b><br>
-    Qty Ach: <span class="${color(LV.ach)}">${LV.ach.toFixed(1)}%</span><br>
-    Rev Ach: <span class="${color(LV.ach$)}">${LV.ach$.toFixed(1)}%</span>
-  </div>
-
-  <div class="card">
-    <b>ICM</b><br>
-    Qty Ach: <span class="${color(ICM.ach)}">${ICM.ach.toFixed(1)}%</span><br>
-    Rev Ach: <span class="${color(ICM.ach$)}">${ICM.ach$.toFixed(1)}%</span>
-  </div>
+  document.getElementById("total").innerHTML=`
+  연 달성: <span class="${color(totalAch)}">${totalAch.toFixed(1)}%</span><br>
+  총 매출: ${totalY.toLocaleString()}
   `;
-
-  save();
 }
 
-// 자동 계산
-setInterval(calculate, 500);
-
 createUI();
-calculate();
+setInterval(calc, 500);
 
 </script>
 
