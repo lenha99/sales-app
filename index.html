@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sales KPI App</title>
+
+<style>
+body { font-family: sans-serif; padding:10px; background:#f5f5f5; }
+.card { background:white; padding:12px; margin-bottom:10px; border-radius:12px; box-shadow:0 2px 5px rgba(0,0,0,0.1);}
+h2 { margin-bottom:5px; }
+input { width:70px; padding:5px; margin:2px;}
+button { padding:5px 10px; margin:2px; border-radius:6px; border:none; background:#eee;}
+.result { font-size:14px; margin-top:5px;}
+.green { color:green; font-weight:bold;}
+.yellow { color:orange; font-weight:bold;}
+.red { color:red; font-weight:bold;}
+.big { font-size:18px; font-weight:bold;}
+</style>
+</head>
+
+<body>
+
+<h2>Sales KPI</h2>
+
+<div id="products"></div>
+
+<h3>📊 Group Result</h3>
+<div id="group"></div>
+
+<script>
+
+const products = ["ICD","CRT-D","IPG","CRT-P","ICM"];
+
+function save() {
+  let data = {};
+  products.forEach(p=>{
+    data[p] = {
+      asp: getVal(p,"asp"),
+      yearly: getVal(p,"yearly"),
+      actual: getVal(p,"actual")
+    }
+  });
+  localStorage.setItem("salesData", JSON.stringify(data));
+}
+
+function load() {
+  let data = JSON.parse(localStorage.getItem("salesData") || "{}");
+  return data;
+}
+
+function createUI() {
+  let saved = load();
+  let html = "";
+
+  products.forEach(p=>{
+    let d = saved[p] || {asp:1000000, yearly:0, actual:0};
+
+    html += `
+    <div class="card">
+      <div class="big">${p}</div>
+
+      ASP <input type="number" id="${p}_asp" value="${d.asp}">
+      Yearly <input type="number" id="${p}_yearly" value="${d.yearly}">
+      Actual <input type="number" id="${p}_actual" value="${d.actual}">
+
+      <br>
+      <button onclick="change('${p}',1)">+</button>
+      <button onclick="change('${p}',-1)">-</button>
+
+      <div class="result" id="${p}_result"></div>
+    </div>`;
+  });
+
+  document.getElementById("products").innerHTML = html;
+}
+
+function getVal(p, type){
+  return +document.getElementById(p+"_"+type).value;
+}
+
+function change(p, val){
+  let el = document.getElementById(p+"_actual");
+  el.value = Math.max(0, +el.value + val);
+  calculate();
+}
+
+function calc(d){
+  let monthly = d.yearly / 12;
+  let monthly$ = monthly * d.asp;
+  let actual$ = d.actual * d.asp;
+  let ach = monthly>0 ? (d.actual / monthly * 100) : 0;
+
+  return {monthly, monthly$, actual$, ach};
+}
+
+function color(a){
+  if(a>=100) return "green";
+  if(a>=70) return "yellow";
+  return "red";
+}
+
+function calculate(){
+
+  let data = {};
+  products.forEach(p=>{
+    data[p] = {
+      asp: getVal(p,"asp"),
+      yearly: getVal(p,"yearly"),
+      actual: getVal(p,"actual")
+    }
+  });
+
+  // 제품별 계산
+  products.forEach(p=>{
+    let r = calc(data[p]);
+
+    document.getElementById(p+"_result").innerHTML =
+      `Monthly: ${r.monthly.toFixed(1)}<br>
+       Revenue: ${r.actual$.toLocaleString()}<br>
+       Ach: <span class="${color(r.ach)}">${r.ach.toFixed(1)}%</span>`;
+  });
+
+  // 그룹 계산
+  function group(arr){
+    let actual=0, target=0, actual$=0, target$=0;
+
+    arr.forEach(p=>{
+      let d = data[p];
+      let r = calc(d);
+
+      actual += d.actual;
+      target += d.yearly/12;
+      actual$ += r.actual$;
+      target$ += r.monthly$;
+    });
+
+    let ach = target>0 ? actual/target*100 : 0;
+    let ach$ = target$>0 ? actual$/target$*100 : 0;
+
+    return {actual,target,actual$,target$,ach,ach$};
+  }
+
+  let HV = group(["ICD","CRT-D"]);
+  let LV = group(["IPG","CRT-P"]);
+  let ICM = group(["ICM"]);
+
+  document.getElementById("group").innerHTML = `
+  <div class="card">
+    <b>HV</b><br>
+    Qty Ach: <span class="${color(HV.ach)}">${HV.ach.toFixed(1)}%</span><br>
+    Rev Ach: <span class="${color(HV.ach$)}">${HV.ach$.toFixed(1)}%</span>
+  </div>
+
+  <div class="card">
+    <b>LV</b><br>
+    Qty Ach: <span class="${color(LV.ach)}">${LV.ach.toFixed(1)}%</span><br>
+    Rev Ach: <span class="${color(LV.ach$)}">${LV.ach$.toFixed(1)}%</span>
+  </div>
+
+  <div class="card">
+    <b>ICM</b><br>
+    Qty Ach: <span class="${color(ICM.ach)}">${ICM.ach.toFixed(1)}%</span><br>
+    Rev Ach: <span class="${color(ICM.ach$)}">${ICM.ach$.toFixed(1)}%</span>
+  </div>
+  `;
+
+  save();
+}
+
+// 자동 계산
+setInterval(calculate, 500);
+
+createUI();
+calculate();
+
+</script>
+
+</body>
+</html>
