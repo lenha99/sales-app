@@ -6,47 +6,11 @@
 
 <style>
 body { font-family:sans-serif; padding:10px; background:#f2f4f8;}
-
-.card {
-  background:white;
-  padding:14px;
-  margin-bottom:12px;
-  border-radius:14px;
-  box-shadow:0 3px 8px rgba(0,0,0,0.08);
-}
-
-.grid {
-  display:grid;
-  grid-template-columns:1fr 1fr 1fr;
-  gap:5px;
-}
-
-input {
-  width:100%;
-  padding:6px;
-  border-radius:6px;
-  border:1px solid #ddd;
-  text-align:center;
-}
-
-button {
-  padding:6px 10px;
-  border:none;
-  border-radius:8px;
-  background:#e0e3eb;
-  font-weight:bold;
-}
-
-button:active {
-  transform:scale(0.95);
-}
-
-.flex {
-  display:flex;
-  align-items:center;
-  gap:5px;
-}
-
+.card { background:white; padding:14px; margin-bottom:12px; border-radius:14px; box-shadow:0 3px 8px rgba(0,0,0,0.08);}
+.grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:5px;}
+input { width:100%; padding:6px; border-radius:6px; border:1px solid #ddd; text-align:center;}
+button { padding:6px 10px; border:none; border-radius:8px; background:#e0e3eb; font-weight:bold;}
+.flex { display:flex; align-items:center; gap:5px;}
 .big { font-size:20px; font-weight:bold;}
 .green {color:#0a9f3d;font-weight:bold;}
 .yellow {color:#e6a700;font-weight:bold;}
@@ -79,6 +43,32 @@ const products = [
   {name:"ICM", asp:1.7}
 ];
 
+// 🔥 저장
+function save(){
+  let data = {};
+
+  products.forEach(p=>{
+    data[p.name] = {
+      asp: safe(p.name+"_asp"),
+      yearly: safe(p.name+"_yearly"),
+      actual: safe(p.name+"_actual")
+    };
+  });
+
+  data.rate = safe("rate");
+
+  localStorage.setItem("kpiData", JSON.stringify(data));
+}
+
+// 🔥 불러오기
+function load(){
+  try{
+    return JSON.parse(localStorage.getItem("kpiData")) || {};
+  }catch{
+    return {};
+  }
+}
+
 function safe(id){
   let el=document.getElementById(id);
   return el && el.value ? Number(el.value) : 0;
@@ -90,7 +80,6 @@ function color(v){
   return "red";
 }
 
-// 🔥 버튼 기능
 function change(name, val){
   let input = document.getElementById(name+"_actual");
   let current = Number(input.value) || 0;
@@ -100,12 +89,20 @@ function change(name, val){
   calc();
 }
 
-// UI 생성
+// UI 생성 + 저장값 반영
 function create(){
 
+  let saved = load();
   let html="";
 
   products.forEach(p=>{
+
+    let d = saved[p.name] || {};
+
+    let asp = d.asp ?? p.asp;
+    let yearly = d.yearly ?? 0;
+    let actual = d.actual ?? 0;
+
     html+=`
     <div class="card">
       <div class="big">${p.name}</div>
@@ -114,19 +111,19 @@ function create(){
 
         <div>
           <div class="small">ASP</div>
-          <input id="${p.name}_asp" value="${p.asp}">
+          <input id="${p.name}_asp" value="${asp}">
         </div>
 
         <div>
           <div class="small">연간목표</div>
-          <input id="${p.name}_yearly" value="0">
+          <input id="${p.name}_yearly" value="${yearly}">
         </div>
 
         <div>
           <div class="small">Actual</div>
           <div class="flex">
             <button onclick="change('${p.name}', -1)">-</button>
-            <input id="${p.name}_actual" value="0">
+            <input id="${p.name}_actual" value="${actual}">
             <button onclick="change('${p.name}', 1)">+</button>
           </div>
         </div>
@@ -138,6 +135,11 @@ function create(){
   });
 
   document.getElementById("products").innerHTML=html;
+
+  // 환율도 복원
+  if(saved.rate){
+    document.getElementById("rate").value = saved.rate;
+  }
 }
 
 function calc(){
@@ -195,12 +197,12 @@ function calc(){
 
     <br>
 
-    💰 연 목표: $${totalTarget.toLocaleString()}<br>
+    💰 목표: $${totalTarget.toLocaleString()}<br>
     💰 누적: $${totalRev.toLocaleString()}<br>
 
     <br>
 
-    📉 월당 부족 매출: <span class="highlight">$${gap.toLocaleString()}</span>
+    📉 부족 매출: <span class="highlight">$${gap.toLocaleString()}</span>
 
     <br><br>
 
@@ -217,6 +219,8 @@ function calc(){
 
   </div>
   `;
+
+  save(); // 🔥 여기서 저장
 }
 
 create();
