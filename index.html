@@ -28,7 +28,17 @@ button { padding:6px 10px; border:none; border-radius:8px; background:#e0e3eb; f
 환율 <input id="rate" value="1300">
 </div>
 
+<div class="card">
+<div class="big">그룹 ASP</div>
+HV <input id="HV_asp" value="12.1">
+LV <input id="LV_asp" value="3.3">
+ICM <input id="ICM_asp" value="1.5">
+</div>
+
 <div id="products"></div>
+
+<h3>📊 그룹</h3>
+<div id="group"></div>
 
 <h3>📊 TOTAL</h3>
 <div id="total"></div>
@@ -43,32 +53,6 @@ const products = [
   {name:"ICM", asp:1.7}
 ];
 
-// 🔥 저장
-function save(){
-  let data = {};
-
-  products.forEach(p=>{
-    data[p.name] = {
-      asp: safe(p.name+"_asp"),
-      yearly: safe(p.name+"_yearly"),
-      actual: safe(p.name+"_actual")
-    };
-  });
-
-  data.rate = safe("rate");
-
-  localStorage.setItem("kpiData", JSON.stringify(data));
-}
-
-// 🔥 불러오기
-function load(){
-  try{
-    return JSON.parse(localStorage.getItem("kpiData")) || {};
-  }catch{
-    return {};
-  }
-}
-
 function safe(id){
   let el=document.getElementById(id);
   return el && el.value ? Number(el.value) : 0;
@@ -80,28 +64,57 @@ function color(v){
   return "red";
 }
 
-function change(name, val){
-  let input = document.getElementById(name+"_actual");
-  let current = Number(input.value) || 0;
-  let next = current + val;
-  if(next < 0) next = 0;
-  input.value = next;
+// 저장
+function save(){
+  let data={};
+
+  products.forEach(p=>{
+    data[p.name]={
+      asp:safe(p.name+"_asp"),
+      yearly:safe(p.name+"_yearly"),
+      actual:safe(p.name+"_actual")
+    };
+  });
+
+  data.rate = safe("rate");
+  data.HV_asp = safe("HV_asp");
+  data.LV_asp = safe("LV_asp");
+  data.ICM_asp = safe("ICM_asp");
+
+  localStorage.setItem("kpiData", JSON.stringify(data));
+}
+
+// 불러오기
+function load(){
+  try{
+    return JSON.parse(localStorage.getItem("kpiData")) || {};
+  }catch{
+    return {};
+  }
+}
+
+// 버튼
+function change(name,val){
+  let el=document.getElementById(name+"_actual");
+  let v=(Number(el.value)||0)+val;
+  if(v<0)v=0;
+  el.value=v;
   calc();
 }
 
-// UI 생성 + 저장값 반영
+// UI 생성
 function create(){
 
-  let saved = load();
+  let saved=load();
   let html="";
 
   products.forEach(p=>{
 
-    let d = saved[p.name] || {};
+    let d=saved[p.name]||{};
 
-    let asp = d.asp ?? p.asp;
-    let yearly = d.yearly ?? 0;
-    let actual = d.actual ?? 0;
+    let asp=d.asp ?? p.asp;
+    let yearly=d.yearly ?? 0;
+    let actual=d.actual ?? 0;
 
     html+=`
     <div class="card">
@@ -122,9 +135,9 @@ function create(){
         <div>
           <div class="small">Actual</div>
           <div class="flex">
-            <button onclick="change('${p.name}', -1)">-</button>
+            <button onclick="change('${p.name}',-1)">-</button>
             <input id="${p.name}_actual" value="${actual}">
-            <button onclick="change('${p.name}', 1)">+</button>
+            <button onclick="change('${p.name}',1)">+</button>
           </div>
         </div>
 
@@ -136,15 +149,21 @@ function create(){
 
   document.getElementById("products").innerHTML=html;
 
-  // 환율도 복원
-  if(saved.rate){
-    document.getElementById("rate").value = saved.rate;
-  }
+  // 그룹 asp 복원
+  if(saved.HV_asp) document.getElementById("HV_asp").value = saved.HV_asp;
+  if(saved.LV_asp) document.getElementById("LV_asp").value = saved.LV_asp;
+  if(saved.ICM_asp) document.getElementById("ICM_asp").value = saved.ICM_asp;
+
+  if(saved.rate) document.getElementById("rate").value = saved.rate;
 }
 
 function calc(){
 
   let rate=safe("rate");
+
+  let HVasp=safe("HV_asp");
+  let LVasp=safe("LV_asp");
+  let ICMasp=safe("ICM_asp");
 
   let totalRev=0;
   let totalTarget=0;
@@ -175,6 +194,44 @@ function calc(){
     data[p.name]={asp,yearly,actual};
   });
 
+  // 그룹 계산 (그룹 ASP 사용)
+  function group(names, asp){
+
+    let totalA=0;
+    let totalY=0;
+
+    names.forEach(n=>{
+      totalA += data[n].actual;
+      totalY += data[n].yearly;
+    });
+
+    let rev = totalA * asp;
+    let target = totalY * asp;
+
+    let yAch = target ? rev/target*100 : 0;
+    let mAch = (target/12) ? rev/(target/12)*100 : 0;
+
+    return {rev,yAch,mAch};
+  }
+
+  let HV = group(["ICD","CRT-D"], HVasp);
+  let LV = group(["IPG","CRT-P"], LVasp);
+  let ICM = group(["ICM"], ICMasp);
+
+  function box(name,g){
+    return `
+    <div class="card">
+      <div class="big">${name}</div>
+      연: <span class="${color(g.yAch)}">${g.yAch.toFixed(1)}%</span>
+      | 월: <span class="${color(g.mAch)}">${g.mAch.toFixed(1)}%</span><br>
+      💰 $${g.rev.toLocaleString()} / ₩${(g.rev*rate).toLocaleString()}
+    </div>`;
+  }
+
+  document.getElementById("group").innerHTML =
+    box("HV",HV)+box("LV",LV)+box("ICM",ICM);
+
+  // TOTAL
   let totalAch=totalTarget?totalRev/totalTarget*100:0;
   let monthlyTarget=totalTarget/12;
   let monthlyAch=monthlyTarget?totalRev/monthlyTarget*100:0;
@@ -220,7 +277,7 @@ function calc(){
   </div>
   `;
 
-  save(); // 🔥 여기서 저장
+  save();
 }
 
 create();
