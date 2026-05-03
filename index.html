@@ -201,6 +201,7 @@ function calc(){
   // TOTAL
   let totalAch=totalTarget?totalRev/totalTarget*100:0;
   let monthlyTarget=totalTarget/12;
+  let monthlyAch = monthlyTarget ? totalRev / monthlyTarget * 100 : 0;
   let gap=Math.max(0, monthlyTarget-totalRev);
 
   function need(asp){
@@ -212,9 +213,10 @@ function calc(){
 
     <div class="big">TOTAL KPI</div>
 
-    <div class="highlight">
-      연 달성률: <span class="${color(totalAch)}">${totalAch.toFixed(1)}%</span>
-    </div>
+<div class="highlight">
+  연 달성률: <span class="${color(totalAch)}">${totalAch.toFixed(1)}%</span><br>
+  월 달성률: <span class="${color(monthlyAch)}">${monthlyAch.toFixed(1)}%</span>
+</div>
 
     <br>
 
