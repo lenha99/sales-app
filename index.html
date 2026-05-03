@@ -12,6 +12,7 @@ input { width:70px; margin:2px;}
 .yellow{color:orange;font-weight:bold;}
 .red{color:red;font-weight:bold;}
 .big{font-size:18px;font-weight:bold;}
+.small{font-size:12px;color:#666;}
 </style>
 </head>
 
@@ -23,16 +24,18 @@ input { width:70px; margin:2px;}
 
 <div id="products"></div>
 
-<h3>📊 그룹</h3>
-<div id="group"></div>
+<h3>📊 TOTAL</h3>
+<div id="total"></div>
 
 <script>
 
-const products = ["ICD","CRT-D","IPG","CRT-P","ICM"];
-
-function getMonth(){
-  return new Date().getMonth()+1;
-}
+const products = [
+  {name:"ICD", asp:12.6},
+  {name:"CRT-D", asp:13.2},
+  {name:"IPG", asp:3.4},
+  {name:"CRT-P", asp:5.6},
+  {name:"ICM", asp:1.7}
+];
 
 function val(id){
   return +document.getElementById(id).value;
@@ -47,11 +50,10 @@ function color(v){
 function save(){
   let data={};
   products.forEach(p=>{
-    data[p]={
-      asp:val(p+"_asp"),
-      yearly:val(p+"_yearly"),
-      ytd:val(p+"_ytd"),
-      mtd:val(p+"_mtd")
+    data[p.name]={
+      asp:val(p.name+"_asp"),
+      yearly:val(p.name+"_yearly"),
+      actual:val(p.name+"_actual")
     }
   });
   localStorage.setItem("kpi",JSON.stringify(data));
@@ -66,19 +68,17 @@ function create(){
   let html="";
 
   products.forEach(p=>{
-    let d=saved[p]||{asp:1000,yearly:0,ytd:0,mtd:0};
+    let d=saved[p.name]||{asp:p.asp,yearly:0,actual:0};
 
     html+=`
     <div class="card">
-      <div class="big">${p}</div>
+      <div class="big">${p.name}</div>
 
-      ASP <input id="${p}_asp" value="${d.asp}">
-      연간목표 <input id="${p}_yearly" value="${d.yearly}"><br>
+      ASP <input id="${p.name}_asp" value="${d.asp}">
+      연간목표 <input id="${p.name}_yearly" value="${d.yearly}">
+      누적실적 <input id="${p.name}_actual" value="${d.actual}">
 
-      누적 <input id="${p}_ytd" value="${d.ytd}">
-      이번달 <input id="${p}_mtd" value="${d.mtd}"><br>
-
-      <div id="${p}_res"></div>
+      <div id="${p.name}_res"></div>
     </div>`;
   });
 
@@ -88,107 +88,68 @@ function create(){
 function calc(){
 
   let rate=val("rate");
-  let month=getMonth();
+
+  let totalRev=0;
+  let totalTargetRev=0;
+
+  let productData={};
 
   products.forEach(p=>{
 
-    let asp=val(p+"_asp");
-    let yearly=val(p+"_yearly");
-    let ytd=val(p+"_ytd");
-    let mtd=val(p+"_mtd");
+    let asp=val(p.name+"_asp");
+    let yearly=val(p.name+"_yearly");
+    let actual=val(p.name+"_actual");
 
-    if(yearly===0) return;
+    let rev=actual*asp;
+    let targetRev=yearly*asp;
 
-    let monthTarget=yearly/12;
+    let ach=targetRev?rev/targetRev*100:0;
 
-    let yearlyRevTarget=yearly*asp;
-    let ytdRev=ytd*asp;
-
-    let yAch = ytdRev/yearlyRevTarget*100;
-    let mAch = mtd/monthTarget*100;
-
-    let expected = yearlyRevTarget*(month/12);
-    let pace = ytdRev/expected*100;
-
-    let remainMonth = 12-month;
-    let need = remainMonth>0 ? (yearly-ytd)/remainMonth : 0;
-
-    let krw = ytdRev*rate;
-
-    document.getElementById(p+"_res").innerHTML=`
-    🔥 연: <span class="${color(yAch)}">${yAch.toFixed(1)}%</span>
-    ⚡ 속도: <span class="${color(pace)}">${pace.toFixed(1)}%</span>
-    📅 월: <span class="${color(mAch)}">${mAch.toFixed(1)}%</span><br>
-
-    👉 필요: ${need.toFixed(1)} /월<br>
-
-    💰 $${ytdRev.toLocaleString()} / ₩${krw.toLocaleString()}
+    document.getElementById(p.name+"_res").innerHTML=`
+    연 달성률: <span class="${color(ach)}">${ach.toFixed(1)}%</span><br>
+    💰 $${rev.toLocaleString()} / ₩${(rev*rate).toLocaleString()}
     `;
+
+    totalRev+=rev;
+    totalTargetRev+=targetRev;
+
+    productData[p.name]={asp};
   });
 
-  renderGroup();
+  let totalAch=totalTargetRev?totalRev/totalTargetRev*100:0;
+  let remainRev=totalTargetRev-totalRev;
 
-  save();
-}
-
-function groupCalc(names){
-
-  let rate=val("rate");
-  let month=getMonth();
-
-  let totalQty=0;
-  let totalTarget=0;
-  let totalRev=0;
-  let totalRevTarget=0;
-
-  names.forEach(p=>{
-    let asp=val(p+"_asp");
-    let yearly=val(p+"_yearly");
-    let ytd=val(p+"_ytd");
-
-    totalQty+=ytd;
-    totalTarget+=yearly;
-    totalRev+=ytd*asp;
-    totalRevTarget+=yearly*asp;
-  });
-
-  if(totalTarget===0) return {ach:0,pace:0,need:0,totalRev:0};
-
-  let ach=totalRev/totalRevTarget*100;
-  let pace=totalRev/(totalRevTarget*(month/12))*100;
-
-  let remainMonth=12-month;
-  let need=remainMonth>0?(totalTarget-totalQty)/remainMonth:0;
-
-  return {ach,pace,need,totalRev,rate};
-}
-
-function renderGroup(){
-
-  let HV=groupCalc(["ICD","CRT-D"]);
-  let LV=groupCalc(["IPG","CRT-P"]);
-  let ICM=groupCalc(["ICM"]);
-  let TOTAL=groupCalc(products);
-
-  function box(name,g){
-    return `
-    <div class="card">
-      <div class="big">${name}</div>
-
-      연: <span class="${color(g.ach)}">${g.ach.toFixed(1)}%</span>
-      속도: <span class="${color(g.pace)}">${g.pace.toFixed(1)}%</span><br>
-
-      👉 필요: ${g.need.toFixed(1)} /월<br>
-
-      💰 $${g.totalRev.toLocaleString()} / ₩${(g.totalRev*g.rate).toLocaleString()}
-    </div>`;
+  // 필요 수량 계산
+  function need(asp){
+    return asp>0 ? Math.ceil(remainRev/asp) : 0;
   }
 
-  document.getElementById("group").innerHTML =
-    box("HV",HV)+
-    box("LV",LV)+
-    box("ICM",ICM)+
-    box("TOTAL",TOTAL);
+  document.getElementById("total").innerHTML=`
+  <div class="card">
+    <div class="big">TOTAL</div>
+
+    연 달성률: <span class="${color(totalAch)}">${totalAch.toFixed(1)}%</span><br>
+
+    💰 누적 매출:
+    $${totalRev.toLocaleString()} / ₩${(totalRev*rate).toLocaleString()}<br><br>
+
+    👉 남은 매출:
+    $${remainRev.toLocaleString()} / ₩${(remainRev*rate).toLocaleString()}<br><br>
+
+    <b>👉 남은 목표를 한 제품으로만 채운다면:</b><br>
+
+    ICD만 → 약 ${need(val("ICD_asp"))}개<br>
+    CRT-D만 → 약 ${need(val("CRT-D_asp"))}개<br>
+    IPG만 → 약 ${need(val("IPG_asp"))}개<br>
+    CRT-P만 → 약 ${need(val("CRT-P_asp"))}개<br>
+
+    <div class="small">
+    ※ 위 수치는 한 가지 제품만으로 목표를 채운 경우 기준입니다.
+    </div>
+  </div>
+  `;
+
+  save();
 }
 
 create();
