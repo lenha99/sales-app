@@ -5,15 +5,7 @@
 <title>Sales KPI</title>
 
 <style>
-body {
-  font-family:sans-serif;
-  padding:10px;
-  background:#f2f4f8;
-}
-
-h2 {
-  margin-bottom:5px;
-}
+body { font-family:sans-serif; padding:10px; background:#f2f4f8;}
 
 .card {
   background:white;
@@ -27,7 +19,6 @@ h2 {
   display:grid;
   grid-template-columns:1fr 1fr 1fr;
   gap:5px;
-  margin-top:5px;
 }
 
 input {
@@ -35,47 +26,45 @@ input {
   padding:6px;
   border-radius:6px;
   border:1px solid #ddd;
+  text-align:center;
 }
 
-.big {
-  font-size:20px;
+button {
+  padding:6px 10px;
+  border:none;
+  border-radius:8px;
+  background:#e0e3eb;
   font-weight:bold;
 }
 
-.kpi {
-  font-size:16px;
-  margin-top:5px;
+button:active {
+  transform:scale(0.95);
 }
 
+.flex {
+  display:flex;
+  align-items:center;
+  gap:5px;
+}
+
+.big { font-size:20px; font-weight:bold;}
 .green {color:#0a9f3d;font-weight:bold;}
 .yellow {color:#e6a700;font-weight:bold;}
 .red {color:#d64545;font-weight:bold;}
-
-.highlight {
-  font-size:18px;
-  font-weight:bold;
-}
-
-.small {
-  font-size:12px;
-  color:#777;
-  margin-top:5px;
-}
+.small {font-size:12px;color:#777;}
+.highlight {font-size:18px;font-weight:bold;}
 </style>
 </head>
 
 <body>
 
-<h2>📊 Sales KPI Dashboard</h2>
+<h2>📊 Sales KPI</h2>
 
 <div class="card">
 환율 <input id="rate" value="1300">
 </div>
 
 <div id="products"></div>
-
-<h3>📊 그룹</h3>
-<div id="group"></div>
 
 <h3>📊 TOTAL</h3>
 <div id="total"></div>
@@ -101,6 +90,17 @@ function color(v){
   return "red";
 }
 
+// 🔥 버튼 기능
+function change(name, val){
+  let input = document.getElementById(name+"_actual");
+  let current = Number(input.value) || 0;
+  let next = current + val;
+  if(next < 0) next = 0;
+  input.value = next;
+  calc();
+}
+
+// UI 생성
 function create(){
 
   let html="";
@@ -111,18 +111,26 @@ function create(){
       <div class="big">${p.name}</div>
 
       <div class="grid">
+
         <div>
           <div class="small">ASP</div>
           <input id="${p.name}_asp" value="${p.asp}">
         </div>
+
         <div>
           <div class="small">연간목표</div>
           <input id="${p.name}_yearly" value="0">
         </div>
+
         <div>
           <div class="small">Actual</div>
-          <input id="${p.name}_actual" value="0">
+          <div class="flex">
+            <button onclick="change('${p.name}', -1)">-</button>
+            <input id="${p.name}_actual" value="0">
+            <button onclick="change('${p.name}', 1)">+</button>
+          </div>
         </div>
+
       </div>
 
       <div id="${p.name}_res"></div>
@@ -154,13 +162,9 @@ function calc(){
     let mAch=(yearly/12)?actual/(yearly/12)*100:0;
 
     document.getElementById(p.name+"_res").innerHTML=`
-      <div class="kpi">
-        연: <span class="${color(yAch)}">${yAch.toFixed(1)}%</span>
-        | 월: <span class="${color(mAch)}">${mAch.toFixed(1)}%</span>
-      </div>
-      <div>
-        💰 $${rev.toLocaleString()} / ₩${(rev*rate).toLocaleString()}
-      </div>
+      연: <span class="${color(yAch)}">${yAch.toFixed(1)}%</span>
+      | 월: <span class="${color(mAch)}">${mAch.toFixed(1)}%</span><br>
+      💰 $${rev.toLocaleString()} / ₩${(rev*rate).toLocaleString()}
     `;
 
     totalRev+=rev;
@@ -169,39 +173,10 @@ function calc(){
     data[p.name]={asp,yearly,actual};
   });
 
-  // 그룹
-  function group(names){
-    let rev=0,target=0;
-    names.forEach(n=>{
-      rev+=data[n].actual*data[n].asp;
-      target+=data[n].yearly*data[n].asp;
-    });
-    let ach=target?rev/target*100:0;
-    return {rev,ach};
-  }
-
-  let HV=group(["ICD","CRT-D"]);
-  let LV=group(["IPG","CRT-P"]);
-  let ICM=group(["ICM"]);
-
-  function box(name,g){
-    return `
-    <div class="card">
-      <div class="big">${name}</div>
-      <div class="kpi">
-        연 달성률: <span class="${color(g.ach)}">${g.ach.toFixed(1)}%</span>
-      </div>
-      💰 $${g.rev.toLocaleString()}
-    </div>`;
-  }
-
-  document.getElementById("group").innerHTML =
-    box("HV",HV)+box("LV",LV)+box("ICM",ICM);
-
-  // TOTAL
   let totalAch=totalTarget?totalRev/totalTarget*100:0;
   let monthlyTarget=totalTarget/12;
-  let monthlyAch = monthlyTarget ? totalRev / monthlyTarget * 100 : 0;
+  let monthlyAch=monthlyTarget?totalRev/monthlyTarget*100:0;
+
   let gap=Math.max(0, monthlyTarget-totalRev);
 
   function need(asp){
@@ -213,10 +188,10 @@ function calc(){
 
     <div class="big">TOTAL KPI</div>
 
-<div class="highlight">
-  연 달성률: <span class="${color(totalAch)}">${totalAch.toFixed(1)}%</span><br>
-  월 달성률: <span class="${color(monthlyAch)}">${monthlyAch.toFixed(1)}%</span>
-</div>
+    <div class="highlight">
+      연: <span class="${color(totalAch)}">${totalAch.toFixed(1)}%</span>
+      | 월: <span class="${color(monthlyAch)}">${monthlyAch.toFixed(1)}%</span>
+    </div>
 
     <br>
 
@@ -225,8 +200,7 @@ function calc(){
 
     <br>
 
-    📉 부족 매출: 
-    <span class="highlight">$${gap.toLocaleString()}</span>
+    📉 부족 매출: <span class="highlight">$${gap.toLocaleString()}</span>
 
     <br><br>
 
