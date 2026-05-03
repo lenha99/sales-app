@@ -24,6 +24,9 @@ input { width:70px; margin:2px;}
 
 <div id="products"></div>
 
+<h3>📊 그룹</h3>
+<div id="group"></div>
+
 <h3>📊 TOTAL</h3>
 <div id="total"></div>
 
@@ -37,9 +40,9 @@ const products = [
   {name:"ICM", asp:1.7}
 ];
 
-function safeVal(id){
+function safe(id){
   let el = document.getElementById(id);
-  return el && el.value ? +el.value : 0;
+  return el && el.value ? Number(el.value) : 0;
 }
 
 function color(v){
@@ -48,94 +51,102 @@ function color(v){
   return "red";
 }
 
-function save(){
-  let data={};
-  products.forEach(p=>{
-    data[p.name]={
-      asp:safeVal(p.name+"_asp"),
-      yearly:safeVal(p.name+"_yearly"),
-      actual:safeVal(p.name+"_actual")
-    }
-  });
-  localStorage.setItem("kpi",JSON.stringify(data));
-}
-
-function load(){
-  try{
-    return JSON.parse(localStorage.getItem("kpi")) || {};
-  }catch{
-    return {};
-  }
-}
-
 function create(){
 
-  let saved = load();
-  let html = "";
+  let html="";
 
   products.forEach(p=>{
-
-    let d = saved[p.name] || {};
-
-    let asp = d.asp || p.asp;   // 기본 ASP 강제 적용
-    let yearly = d.yearly || 0;
-    let actual = d.actual || 0;
-
-    html += `
+    html+=`
     <div class="card">
       <div class="big">${p.name}</div>
 
-      ASP <input id="${p.name}_asp" value="${asp}">
-      연간목표 <input id="${p.name}_yearly" value="${yearly}">
-      Actual <input id="${p.name}_actual" value="${actual}">
+      ASP <input id="${p.name}_asp" value="${p.asp}">
+      연간목표 <input id="${p.name}_yearly" value="0">
+      Actual <input id="${p.name}_actual" value="0">
 
       <div id="${p.name}_res"></div>
     </div>`;
   });
 
-  document.getElementById("products").innerHTML = html;
+  document.getElementById("products").innerHTML=html;
 }
 
 function calc(){
 
-  let rate = safeVal("rate");
+  let rate = safe("rate");
 
-  let totalRev = 0;
-  let totalTargetRev = 0;
+  let totalRev=0;
+  let totalTarget=0;
 
-  let aspMap = {};
+  let data={};
 
   products.forEach(p=>{
 
-    let asp = safeVal(p.name+"_asp");
-    let yearly = safeVal(p.name+"_yearly");
-    let actual = safeVal(p.name+"_actual");
+    let asp = safe(p.name+"_asp");
+    let yearly = safe(p.name+"_yearly");
+    let actual = safe(p.name+"_actual");
 
-    aspMap[p.name] = asp;
+    let rev = actual*asp;
+    let target = yearly*asp;
 
-    let rev = actual * asp;
-    let targetRev = yearly * asp;
+    let ach = target? rev/target*100 : 0;
 
-    let ach = targetRev ? (rev/targetRev*100) : 0;
-
-    document.getElementById(p.name+"_res").innerHTML = `
+    document.getElementById(p.name+"_res").innerHTML=`
     연 달성률: <span class="${color(ach)}">${ach.toFixed(1)}%</span><br>
     💰 $${rev.toLocaleString()} / ₩${(rev*rate).toLocaleString()}
     `;
 
     totalRev += rev;
-    totalTargetRev += targetRev;
+    totalTarget += target;
 
+    data[p.name]={asp,yearly,actual};
   });
 
-  let totalAch = totalTargetRev ? (totalRev/totalTargetRev*100) : 0;
-  let remainRev = totalTargetRev - totalRev;
+  // 그룹 계산
+  function group(names){
 
-  function need(asp){
-    return asp > 0 ? Math.ceil(remainRev / asp) : 0;
+    let rev=0, target=0, qty=0, targetQty=0;
+
+    names.forEach(n=>{
+      let d=data[n];
+      rev += d.actual*d.asp;
+      target += d.yearly*d.asp;
+      qty += d.actual;
+      targetQty += d.yearly;
+    });
+
+    let ach = target? rev/target*100 : 0;
+
+    return {rev,target,ach,qty,targetQty};
   }
 
-  document.getElementById("total").innerHTML = `
+  let HV = group(["ICD","CRT-D"]);
+  let LV = group(["IPG","CRT-P"]);
+  let ICM = group(["ICM"]);
+
+  function box(name,g){
+    return `
+    <div class="card">
+      <div class="big">${name}</div>
+      연 달성률: <span class="${color(g.ach)}">${g.ach.toFixed(1)}%</span><br>
+      💰 $${g.rev.toLocaleString()} / ₩${(g.rev*rate).toLocaleString()}
+    </div>`;
+  }
+
+  document.getElementById("group").innerHTML =
+    box("HV",HV)+
+    box("LV",LV)+
+    box("ICM",ICM);
+
+  // TOTAL
+  let totalAch = totalTarget? totalRev/totalTarget*100 : 0;
+  let remain = totalTarget-totalRev;
+
+  function need(asp){
+    return asp>0 ? Math.ceil(remain/asp) : 0;
+  }
+
+  document.getElementById("total").innerHTML=`
   <div class="card">
     <div class="big">TOTAL</div>
 
@@ -145,22 +156,20 @@ function calc(){
     $${totalRev.toLocaleString()} / ₩${(totalRev*rate).toLocaleString()}<br><br>
 
     👉 남은 매출:
-    $${remainRev.toLocaleString()} / ₩${(remainRev*rate).toLocaleString()}<br><br>
+    $${remain.toLocaleString()} / ₩${(remain*rate).toLocaleString()}<br><br>
 
     <b>👉 남은 목표를 한 제품으로만 채운다면:</b><br>
 
-    ICD → 약 ${need(aspMap["ICD"])}개<br>
-    CRT-D → 약 ${need(aspMap["CRT-D"])}개<br>
-    IPG → 약 ${need(aspMap["IPG"])}개<br>
-    CRT-P → 약 ${need(aspMap["CRT-P"])}개<br>
+    ICD → 약 ${need(data["ICD"].asp)}개<br>
+    CRT-D → 약 ${need(data["CRT-D"].asp)}개<br>
+    IPG → 약 ${need(data["IPG"].asp)}개<br>
+    CRT-P → 약 ${need(data["CRT-P"].asp)}개<br>
 
     <div class="small">
     ※ 한 제품만으로 목표를 채운 경우 기준입니다.
     </div>
   </div>
   `;
-
-  save();
 }
 
 create();
