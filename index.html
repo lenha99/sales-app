@@ -2,121 +2,197 @@
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>KPI Dashboard</title>
+<title>Sales KPI</title>
 
 <style>
-body { font-family:sans-serif; padding:10px; background:#f5f5f5; }
-.card { background:white; padding:12px; margin-bottom:10px; border-radius:12px; }
-input { width:70px; margin:2px; }
-.green { color:green; font-weight:bold;}
-.yellow { color:orange; font-weight:bold;}
-.red { color:red; font-weight:bold;}
-.big { font-size:18px; font-weight:bold;}
+body { font-family:sans-serif; padding:10px; background:#f5f5f5;}
+.card { background:white; padding:12px; margin-bottom:10px; border-radius:12px;}
+input { width:70px; margin:2px;}
+.green{color:green;font-weight:bold;}
+.yellow{color:orange;font-weight:bold;}
+.red{color:red;font-weight:bold;}
+.big{font-size:18px;font-weight:bold;}
 </style>
 </head>
 
 <body>
 
-<h2>KPI Dashboard</h2>
+<h2>📊 Sales KPI</h2>
 
 환율 <input id="rate" value="1300"><br><br>
 
 <div id="products"></div>
 
-<h3>📊 TOTAL</h3>
-<div id="total"></div>
+<h3>📊 그룹</h3>
+<div id="group"></div>
 
 <script>
 
-const list = ["ICD","CRT-D","IPG","CRT-P","ICM"];
+const products = ["ICD","CRT-D","IPG","CRT-P","ICM"];
 
-function createUI(){
+function getMonth(){
+  return new Date().getMonth()+1;
+}
+
+function val(id){
+  return +document.getElementById(id).value;
+}
+
+function color(v){
+  if(v>=100) return "green";
+  if(v>=80) return "yellow";
+  return "red";
+}
+
+function save(){
+  let data={};
+  products.forEach(p=>{
+    data[p]={
+      asp:val(p+"_asp"),
+      yearly:val(p+"_yearly"),
+      ytd:val(p+"_ytd"),
+      mtd:val(p+"_mtd")
+    }
+  });
+  localStorage.setItem("kpi",JSON.stringify(data));
+}
+
+function load(){
+  return JSON.parse(localStorage.getItem("kpi")||"{}");
+}
+
+function create(){
+  let saved=load();
   let html="";
-  list.forEach(p=>{
+
+  products.forEach(p=>{
+    let d=saved[p]||{asp:1000,yearly:0,ytd:0,mtd:0};
+
     html+=`
     <div class="card">
       <div class="big">${p}</div>
 
-      ASP <input id="${p}_asp" value="1000">
-      Yearly <input id="${p}_year" value="0"><br>
+      ASP <input id="${p}_asp" value="${d.asp}">
+      연간목표 <input id="${p}_yearly" value="${d.yearly}"><br>
 
-      MTD <input id="${p}_mtd" value="0">
-      QTD <input id="${p}_qtd" value="0">
-      YTD <input id="${p}_ytd" value="0"><br>
+      누적 <input id="${p}_ytd" value="${d.ytd}">
+      이번달 <input id="${p}_mtd" value="${d.mtd}"><br>
 
       <div id="${p}_res"></div>
     </div>`;
   });
+
   document.getElementById("products").innerHTML=html;
-}
-
-function val(id){ return +document.getElementById(id).value; }
-
-function color(v){
-  if(v>=100) return "green";
-  if(v>=90) return "yellow";
-  return "red";
 }
 
 function calc(){
 
-  let rate = val("rate");
+  let rate=val("rate");
+  let month=getMonth();
 
-  let totalY=0, totalTarget=0;
+  products.forEach(p=>{
 
-  list.forEach(p=>{
+    let asp=val(p+"_asp");
+    let yearly=val(p+"_yearly");
+    let ytd=val(p+"_ytd");
+    let mtd=val(p+"_mtd");
 
-    let asp = val(p+"_asp");
-    let yearly = val(p+"_year");
-    let mtd = val(p+"_mtd");
-    let qtd = val(p+"_qtd");
-    let ytd = val(p+"_ytd");
+    if(yearly===0) return;
 
-    let monthTarget = yearly/12;
-    let quarterTarget = yearly/4;
+    let monthTarget=yearly/12;
 
-    let mAch = monthTarget? mtd/monthTarget*100:0;
-    let qAch = quarterTarget? qtd/quarterTarget*100:0;
+    let yearlyRevTarget=yearly*asp;
+    let ytdRev=ytd*asp;
 
-    let yRev = ytd*asp;
-    let yTargetRev = yearly*asp;
-    let yAch = yTargetRev? yRev/yTargetRev*100:0;
+    let yAch = ytdRev/yearlyRevTarget*100;
+    let mAch = mtd/monthTarget*100;
 
-    // 분기 남은
-    let remainQ = quarterTarget - qtd;
+    let expected = yearlyRevTarget*(month/12);
+    let pace = ytdRev/expected*100;
 
-    // 남은 달 계산 (간단히 1~3)
-    let remainMonth = Math.max(1, 3 - Math.floor(qtd / (quarterTarget/3)));
+    let remainMonth = 12-month;
+    let need = remainMonth>0 ? (yearly-ytd)/remainMonth : 0;
 
-    let need = remainQ>0? (remainQ/remainMonth):0;
-
-    let over = yRev - yTargetRev;
+    let krw = ytdRev*rate;
 
     document.getElementById(p+"_res").innerHTML=`
-    분기: <span class="${color(qAch)}">${qAch.toFixed(1)}%</span><br>
+    🔥 연: <span class="${color(yAch)}">${yAch.toFixed(1)}%</span>
+    ⚡ 속도: <span class="${color(pace)}">${pace.toFixed(1)}%</span>
+    📅 월: <span class="${color(mAch)}">${mAch.toFixed(1)}%</span><br>
+
     👉 필요: ${need.toFixed(1)} /월<br>
 
-    월: <span class="${color(mAch)}">${mAch.toFixed(1)}%</span><br>
-    연: <span class="${color(yAch)}">${yAch.toFixed(1)}%</span><br>
-
-    💰 초과: ${over>0? "+"+over.toLocaleString():over.toLocaleString()}
+    💰 $${ytdRev.toLocaleString()} / ₩${krw.toLocaleString()}
     `;
-
-    totalY += yRev;
-    totalTarget += yTargetRev;
-
   });
 
-  let totalAch = totalTarget? totalY/totalTarget*100:0;
+  renderGroup();
 
-  document.getElementById("total").innerHTML=`
-  연 달성: <span class="${color(totalAch)}">${totalAch.toFixed(1)}%</span><br>
-  총 매출: ${totalY.toLocaleString()}
-  `;
+  save();
 }
 
-createUI();
-setInterval(calc, 500);
+function groupCalc(names){
+
+  let rate=val("rate");
+  let month=getMonth();
+
+  let totalQty=0;
+  let totalTarget=0;
+  let totalRev=0;
+  let totalRevTarget=0;
+
+  names.forEach(p=>{
+    let asp=val(p+"_asp");
+    let yearly=val(p+"_yearly");
+    let ytd=val(p+"_ytd");
+
+    totalQty+=ytd;
+    totalTarget+=yearly;
+    totalRev+=ytd*asp;
+    totalRevTarget+=yearly*asp;
+  });
+
+  if(totalTarget===0) return {ach:0,pace:0,need:0,totalRev:0};
+
+  let ach=totalRev/totalRevTarget*100;
+  let pace=totalRev/(totalRevTarget*(month/12))*100;
+
+  let remainMonth=12-month;
+  let need=remainMonth>0?(totalTarget-totalQty)/remainMonth:0;
+
+  return {ach,pace,need,totalRev,rate};
+}
+
+function renderGroup(){
+
+  let HV=groupCalc(["ICD","CRT-D"]);
+  let LV=groupCalc(["IPG","CRT-P"]);
+  let ICM=groupCalc(["ICM"]);
+  let TOTAL=groupCalc(products);
+
+  function box(name,g){
+    return `
+    <div class="card">
+      <div class="big">${name}</div>
+
+      연: <span class="${color(g.ach)}">${g.ach.toFixed(1)}%</span>
+      속도: <span class="${color(g.pace)}">${g.pace.toFixed(1)}%</span><br>
+
+      👉 필요: ${g.need.toFixed(1)} /월<br>
+
+      💰 $${g.totalRev.toLocaleString()} / ₩${(g.totalRev*g.rate).toLocaleString()}
+    </div>`;
+  }
+
+  document.getElementById("group").innerHTML =
+    box("HV",HV)+
+    box("LV",LV)+
+    box("ICM",ICM)+
+    box("TOTAL",TOTAL);
+}
+
+create();
+setInterval(calc,500);
 
 </script>
 
