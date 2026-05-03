@@ -37,8 +37,9 @@ const products = [
   {name:"ICM", asp:1.7}
 ];
 
-function val(id){
-  return +document.getElementById(id).value;
+function safeVal(id){
+  let el = document.getElementById(id);
+  return el && el.value ? +el.value : 0;
 }
 
 function color(v){
@@ -51,80 +52,90 @@ function save(){
   let data={};
   products.forEach(p=>{
     data[p.name]={
-      asp:val(p.name+"_asp"),
-      yearly:val(p.name+"_yearly"),
-      actual:val(p.name+"_actual")
+      asp:safeVal(p.name+"_asp"),
+      yearly:safeVal(p.name+"_yearly"),
+      actual:safeVal(p.name+"_actual")
     }
   });
   localStorage.setItem("kpi",JSON.stringify(data));
 }
 
 function load(){
-  return JSON.parse(localStorage.getItem("kpi")||"{}");
+  try{
+    return JSON.parse(localStorage.getItem("kpi")) || {};
+  }catch{
+    return {};
+  }
 }
 
 function create(){
-  let saved=load();
-  let html="";
+
+  let saved = load();
+  let html = "";
 
   products.forEach(p=>{
-    let d=saved[p.name]||{asp:p.asp,yearly:0,actual:0};
 
-    html+=`
+    let d = saved[p.name] || {};
+
+    let asp = d.asp || p.asp;   // 기본 ASP 강제 적용
+    let yearly = d.yearly || 0;
+    let actual = d.actual || 0;
+
+    html += `
     <div class="card">
       <div class="big">${p.name}</div>
 
-      ASP <input id="${p.name}_asp" value="${d.asp}">
-      연간목표 <input id="${p.name}_yearly" value="${d.yearly}">
-      누적실적 <input id="${p.name}_actual" value="${d.actual}">
+      ASP <input id="${p.name}_asp" value="${asp}">
+      연간목표 <input id="${p.name}_yearly" value="${yearly}">
+      Actual <input id="${p.name}_actual" value="${actual}">
 
       <div id="${p.name}_res"></div>
     </div>`;
   });
 
-  document.getElementById("products").innerHTML=html;
+  document.getElementById("products").innerHTML = html;
 }
 
 function calc(){
 
-  let rate=val("rate");
+  let rate = safeVal("rate");
 
-  let totalRev=0;
-  let totalTargetRev=0;
+  let totalRev = 0;
+  let totalTargetRev = 0;
 
-  let productData={};
+  let aspMap = {};
 
   products.forEach(p=>{
 
-    let asp=val(p.name+"_asp");
-    let yearly=val(p.name+"_yearly");
-    let actual=val(p.name+"_actual");
+    let asp = safeVal(p.name+"_asp");
+    let yearly = safeVal(p.name+"_yearly");
+    let actual = safeVal(p.name+"_actual");
 
-    let rev=actual*asp;
-    let targetRev=yearly*asp;
+    aspMap[p.name] = asp;
 
-    let ach=targetRev?rev/targetRev*100:0;
+    let rev = actual * asp;
+    let targetRev = yearly * asp;
 
-    document.getElementById(p.name+"_res").innerHTML=`
+    let ach = targetRev ? (rev/targetRev*100) : 0;
+
+    document.getElementById(p.name+"_res").innerHTML = `
     연 달성률: <span class="${color(ach)}">${ach.toFixed(1)}%</span><br>
     💰 $${rev.toLocaleString()} / ₩${(rev*rate).toLocaleString()}
     `;
 
-    totalRev+=rev;
-    totalTargetRev+=targetRev;
+    totalRev += rev;
+    totalTargetRev += targetRev;
 
-    productData[p.name]={asp};
   });
 
-  let totalAch=totalTargetRev?totalRev/totalTargetRev*100:0;
-  let remainRev=totalTargetRev-totalRev;
+  let totalAch = totalTargetRev ? (totalRev/totalTargetRev*100) : 0;
+  let remainRev = totalTargetRev - totalRev;
 
-  // 필요 수량 계산
   function need(asp){
-    return asp>0 ? Math.ceil(remainRev/asp) : 0;
+    return asp > 0 ? Math.ceil(remainRev / asp) : 0;
   }
 
-  document.getElementById("total").innerHTML=`
+  document.getElementById("total").innerHTML = `
   <div class="card">
     <div class="big">TOTAL</div>
 
@@ -138,13 +149,13 @@ function calc(){
 
     <b>👉 남은 목표를 한 제품으로만 채운다면:</b><br>
 
-    ICD만 → 약 ${need(val("ICD_asp"))}개<br>
-    CRT-D만 → 약 ${need(val("CRT-D_asp"))}개<br>
-    IPG만 → 약 ${need(val("IPG_asp"))}개<br>
-    CRT-P만 → 약 ${need(val("CRT-P_asp"))}개<br>
+    ICD → 약 ${need(aspMap["ICD"])}개<br>
+    CRT-D → 약 ${need(aspMap["CRT-D"])}개<br>
+    IPG → 약 ${need(aspMap["IPG"])}개<br>
+    CRT-P → 약 ${need(aspMap["CRT-P"])}개<br>
 
     <div class="small">
-    ※ 위 수치는 한 가지 제품만으로 목표를 채운 경우 기준입니다.
+    ※ 한 제품만으로 목표를 채운 경우 기준입니다.
     </div>
   </div>
   `;
