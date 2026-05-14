@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html>
 <head>
@@ -5,18 +6,87 @@
 <title>Sales KPI</title>
 
 <style>
-body { font-family:sans-serif; padding:10px; background:#f2f4f8;}
-.card { background:white; padding:14px; margin-bottom:12px; border-radius:14px; box-shadow:0 3px 8px rgba(0,0,0,0.08);}
-.grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:5px;}
-input { width:100%; padding:6px; border-radius:6px; border:1px solid #ddd; text-align:center;}
-button { padding:6px 10px; border:none; border-radius:8px; background:#e0e3eb; font-weight:bold;}
-.flex { display:flex; align-items:center; gap:5px;}
-.big { font-size:20px; font-weight:bold;}
-.green {color:#0a9f3d;font-weight:bold;}
-.yellow {color:#e6a700;font-weight:bold;}
-.red {color:#d64545;font-weight:bold;}
-.small {font-size:12px;color:#777;}
-.highlight {font-size:18px;font-weight:bold;}
+
+body{
+  font-family:sans-serif;
+  background:#f2f4f8;
+  padding:10px;
+}
+
+.card{
+  background:white;
+  border-radius:14px;
+  padding:14px;
+  margin-bottom:12px;
+  box-shadow:0 2px 8px rgba(0,0,0,0.08);
+}
+
+.big{
+  font-size:20px;
+  font-weight:bold;
+}
+
+.small{
+  font-size:12px;
+  color:#666;
+}
+
+.grid{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:6px;
+}
+
+input{
+  width:100%;
+  padding:7px;
+  border-radius:8px;
+  border:1px solid #ddd;
+  text-align:center;
+  box-sizing:border-box;
+}
+
+button{
+  border:none;
+  border-radius:8px;
+  padding:8px 12px;
+  background:#e4e7ec;
+  font-weight:bold;
+  cursor:pointer;
+}
+
+.green{
+  color:#169c3a;
+  font-weight:bold;
+}
+
+.yellow{
+  color:#dca600;
+  font-weight:bold;
+}
+
+.red{
+  color:#d84040;
+  font-weight:bold;
+}
+
+.highlight{
+  font-size:18px;
+  font-weight:bold;
+}
+
+.hospital-row{
+  border-top:1px solid #eee;
+  padding-top:10px;
+  margin-top:10px;
+}
+
+.flex{
+  display:flex;
+  gap:5px;
+  align-items:center;
+}
+
 </style>
 </head>
 
@@ -25,263 +95,623 @@ button { padding:6px 10px; border:none; border-radius:8px; background:#e0e3eb; f
 <h2>📊 Sales KPI</h2>
 
 <div class="card">
-환율 <input id="rate" value="1300">
+  환율
+  <input id="rate" value="1300">
 </div>
 
 <div class="card">
-<div class="big">그룹 ASP</div>
-HV <input id="HV_asp" value="12.1">
-LV <input id="LV_asp" value="3.3">
-ICM <input id="ICM_asp" value="1.5">
+
+  <div class="big">그룹 ASP</div>
+
+  HV
+  <input id="HV_asp" value="12.1">
+
+  LV
+  <input id="LV_asp" value="3.3">
+
+  ICM
+  <input id="ICM_asp" value="1.5">
+
 </div>
 
 <div id="products"></div>
 
-<h3>📊 그룹</h3>
+<h3>📊 그룹 KPI</h3>
 <div id="group"></div>
 
-<h3>📊 TOTAL</h3>
+<h3>📊 TOTAL KPI</h3>
 <div id="total"></div>
+
+<h3>🏥 Hospital Tracking</h3>
+
+<div class="card">
+
+  <button onclick="addHospital()">+ 병원 추가</button>
+
+  <div id="hospitals"></div>
+
+</div>
 
 <script>
 
 const products = [
+
   {name:"ICD", asp:12.6},
   {name:"CRT-D", asp:13.2},
   {name:"IPG", asp:3.4},
   {name:"CRT-P", asp:5.6},
   {name:"ICM", asp:1.7}
+
 ];
 
+let hospitals = [];
+
 function safe(id){
-  let el=document.getElementById(id);
-  return el && el.value ? Number(el.value) : 0;
+
+  let el = document.getElementById(id);
+
+  return el && el.value
+    ? Math.max(0, Number(el.value) || 0)
+    : 0;
 }
 
 function color(v){
-  if(v>=100) return "green";
-  if(v>=80) return "yellow";
+
+  if(v >= 100) return "green";
+
+  if(v >= 80) return "yellow";
+
   return "red";
 }
 
-// 저장
 function save(){
-  let data={};
+
+  let data = {};
 
   products.forEach(p=>{
-    data[p.name]={
+
+    data[p.name] = {
+
       asp:safe(p.name+"_asp"),
-      yearly:safe(p.name+"_yearly"),
-      actual:safe(p.name+"_actual")
+      yearly:safe(p.name+"_yearly")
+
     };
+
   });
 
   data.rate = safe("rate");
+
   data.HV_asp = safe("HV_asp");
   data.LV_asp = safe("LV_asp");
   data.ICM_asp = safe("ICM_asp");
 
-  localStorage.setItem("kpiData", JSON.stringify(data));
+  data.hospitals = hospitals;
+
+  localStorage.setItem(
+    "kpiData",
+    JSON.stringify(data)
+  );
 }
 
-// 불러오기
 function load(){
+
   try{
-    return JSON.parse(localStorage.getItem("kpiData")) || {};
+
+    return JSON.parse(
+      localStorage.getItem("kpiData")
+    ) || {};
+
   }catch{
+
     return {};
+
   }
 }
 
-// 버튼
-function change(name,val){
-  let el=document.getElementById(name+"_actual");
-  let v=(Number(el.value)||0)+val;
-  if(v<0)v=0;
-  el.value=v;
-  calc();
-}
-
-// UI 생성
 function create(){
 
-  let saved=load();
-  let html="";
+  let saved = load();
+
+  let html = "";
 
   products.forEach(p=>{
 
-    let d=saved[p.name]||{};
+    let d = saved[p.name] || {};
 
-    let asp=d.asp ?? p.asp;
-    let yearly=d.yearly ?? 0;
-    let actual=d.actual ?? 0;
+    let asp = d.asp ?? p.asp;
 
-    html+=`
+    let yearly = d.yearly ?? 0;
+
+    html += `
+
     <div class="card">
+
       <div class="big">${p.name}</div>
 
       <div class="grid">
 
         <div>
+
           <div class="small">ASP</div>
-          <input id="${p.name}_asp" value="${asp}">
+
+          <input
+            id="${p.name}_asp"
+            type="number"
+            min="0"
+            value="${asp}"
+          >
+
         </div>
 
         <div>
+
           <div class="small">연간목표</div>
-          <input id="${p.name}_yearly" value="${yearly}">
+
+          <input
+            id="${p.name}_yearly"
+            type="number"
+            min="0"
+            value="${yearly}"
+          >
+
         </div>
 
         <div>
-          <div class="small">Actual</div>
-          <div class="flex">
-            <button onclick="change('${p.name}',-1)">-</button>
-            <input id="${p.name}_actual" value="${actual}">
-            <button onclick="change('${p.name}',1)">+</button>
-          </div>
+
+          <div class="small">자동 Actual</div>
+
+          <input
+            id="${p.name}_actual"
+            readonly
+          >
+
         </div>
 
       </div>
 
       <div id="${p.name}_res"></div>
-    </div>`;
+
+    </div>
+
+    `;
   });
 
-  document.getElementById("products").innerHTML=html;
+  document.getElementById("products").innerHTML = html;
 
-  // 그룹 asp 복원
-  if(saved.HV_asp) document.getElementById("HV_asp").value = saved.HV_asp;
-  if(saved.LV_asp) document.getElementById("LV_asp").value = saved.LV_asp;
-  if(saved.ICM_asp) document.getElementById("ICM_asp").value = saved.ICM_asp;
+  if(saved.rate)
+    document.getElementById("rate").value = saved.rate;
 
-  if(saved.rate) document.getElementById("rate").value = saved.rate;
+  if(saved.HV_asp)
+    document.getElementById("HV_asp").value = saved.HV_asp;
+
+  if(saved.LV_asp)
+    document.getElementById("LV_asp").value = saved.LV_asp;
+
+  if(saved.ICM_asp)
+    document.getElementById("ICM_asp").value = saved.ICM_asp;
+
+  hospitals = saved.hospitals || [];
+
+  if(hospitals.length === 0){
+
+    let firstHospital = {
+      name:"평촌성심병원"
+    };
+
+    products.forEach(p=>{
+      firstHospital[p.name] = 0;
+    });
+
+    hospitals.push(firstHospital);
+  }
+
+  renderHospitals();
+}
+
+function addHospital(){
+
+  let newHospital = {
+
+    name:"새 병원"
+
+  };
+
+  products.forEach(p=>{
+
+    newHospital[p.name] = 0;
+
+  });
+
+  hospitals.push(newHospital);
+
+  renderHospitals();
+}
+
+function removeHospital(i){
+
+  if(confirm(`${hospitals[i].name} 삭제하시겠습니까?`)){
+
+    hospitals.splice(i,1);
+
+    renderHospitals();
+  }
+}
+
+function renderHospitals(){
+
+  let html = "";
+
+  hospitals.forEach((h,i)=>{
+
+    html += `
+
+    <div class="hospital-row">
+
+      <div class="flex">
+
+        <input
+          value="${h.name || ''}"
+          onchange="updateHospitalName(${i}, this.value)"
+        >
+
+        <button onclick="removeHospital(${i})">
+          삭제
+        </button>
+
+      </div>
+
+      <div class="grid">
+
+        ${products.map(p=>`
+
+          <div>
+
+            <div class="small">${p.name}</div>
+
+            <input
+              type="number"
+              min="0"
+              value="${h[p.name] || 0}"
+              onchange="updateHospital(${i}, '${p.name}', this.value)"
+            >
+
+          </div>
+
+        `).join('')}
+
+      </div>
+
+      <div
+        id="hospital_total_${i}"
+        class="small"
+      ></div>
+
+    </div>
+
+    `;
+  });
+
+  document.getElementById("hospitals").innerHTML = html;
+
+  calc();
+}
+
+function updateHospital(i,key,val){
+
+  let num = Math.max(0, Number(val) || 0);
+
+  hospitals[i][key] = num;
+
+  calc();
+}
+
+function updateHospitalName(i,val){
+
+  hospitals[i].name = val;
+
+  save();
 }
 
 function calc(){
 
-  let rate=safe("rate");
+  let rate = safe("rate");
 
-  let HVasp=safe("HV_asp");
-  let LVasp=safe("LV_asp");
-  let ICMasp=safe("ICM_asp");
+  let totalRev = 0;
 
-  let totalRev=0;
-  let totalTarget=0;
+  let totalTarget = 0;
 
-  let data={};
+  let data = {};
 
   products.forEach(p=>{
 
-    let asp=safe(p.name+"_asp");
-    let yearly=safe(p.name+"_yearly");
-    let actual=safe(p.name+"_actual");
+    let actual = 0;
 
-    let rev=actual*asp;
-    let target=yearly*asp;
+    hospitals.forEach(h=>{
 
-    let yAch=target?rev/target*100:0;
-    let mAch=(yearly/12)?actual/(yearly/12)*100:0;
+      actual += Number(h[p.name] || 0);
 
-    document.getElementById(p.name+"_res").innerHTML=`
-      연: <span class="${color(yAch)}">${yAch.toFixed(1)}%</span>
-      | 월: <span class="${color(mAch)}">${mAch.toFixed(1)}%</span><br>
-      💰 $${rev.toLocaleString()} / ₩${(rev*rate).toLocaleString()}
-    `;
-
-    totalRev+=rev;
-    totalTarget+=target;
-
-    data[p.name]={asp,yearly,actual};
-  });
-
-  // 그룹 계산 (그룹 ASP 사용)
-  function group(names, asp){
-
-    let totalA=0;
-    let totalY=0;
-
-    names.forEach(n=>{
-      totalA += data[n].actual;
-      totalY += data[n].yearly;
     });
 
-    let rev = totalA * asp;
-    let target = totalY * asp;
+    document.getElementById(
+      p.name+"_actual"
+    ).value = actual;
 
-    let yAch = target ? rev/target*100 : 0;
-    let mAch = (target/12) ? rev/(target/12)*100 : 0;
+    let asp = safe(p.name+"_asp");
 
-    return {rev,yAch,mAch};
+    let yearly = safe(p.name+"_yearly");
+
+    let rev = actual * asp;
+
+    let target = yearly * asp;
+
+    let yAch = target
+      ? rev / target * 100
+      : 0;
+
+    let mAch = (yearly/12)
+      ? actual / (yearly/12) * 100
+      : 0;
+
+    document.getElementById(
+      p.name+"_res"
+    ).innerHTML = `
+
+      연:
+      <span class="${color(yAch)}">
+        ${yAch.toFixed(1)}%
+      </span>
+
+      |
+
+      월:
+      <span class="${color(mAch)}">
+        ${mAch.toFixed(1)}%
+      </span>
+
+      <br>
+
+      💰 $${rev.toLocaleString()}
+      /
+      ₩${(rev*rate).toLocaleString()}
+
+    `;
+
+    totalRev += rev;
+
+    totalTarget += target;
+
+    data[p.name] = {
+
+      actual,
+      asp,
+      yearly
+
+    };
+
+  });
+
+  function group(names, asp){
+
+    let actual = 0;
+
+    let yearly = 0;
+
+    names.forEach(n=>{
+
+      actual += data[n].actual;
+
+      yearly += data[n].yearly;
+
+    });
+
+    let rev = actual * asp;
+
+    let target = yearly * asp;
+
+    let yAch = target
+      ? rev/target*100
+      : 0;
+
+    let mAch = (target/12)
+      ? rev/(target/12)*100
+      : 0;
+
+    return {
+
+      rev,
+      yAch,
+      mAch
+
+    };
   }
 
-  let HV = group(["ICD","CRT-D"], HVasp);
-  let LV = group(["IPG","CRT-P"], LVasp);
-  let ICM = group(["ICM"], ICMasp);
+  let HV = group(
+    ["ICD","CRT-D"],
+    safe("HV_asp")
+  );
 
-  function box(name,g){
+  let LV = group(
+    ["IPG","CRT-P"],
+    safe("LV_asp")
+  );
+
+  let ICM = group(
+    ["ICM"],
+    safe("ICM_asp")
+  );
+
+  function groupBox(name,g){
+
     return `
+
     <div class="card">
+
       <div class="big">${name}</div>
-      연: <span class="${color(g.yAch)}">${g.yAch.toFixed(1)}%</span>
-      | 월: <span class="${color(g.mAch)}">${g.mAch.toFixed(1)}%</span><br>
-      💰 $${g.rev.toLocaleString()} / ₩${(g.rev*rate).toLocaleString()}
-    </div>`;
+
+      연:
+      <span class="${color(g.yAch)}">
+        ${g.yAch.toFixed(1)}%
+      </span>
+
+      |
+
+      월:
+      <span class="${color(g.mAch)}">
+        ${g.mAch.toFixed(1)}%
+      </span>
+
+      <br>
+
+      💰 $${g.rev.toLocaleString()}
+      /
+      ₩${(g.rev*rate).toLocaleString()}
+
+    </div>
+
+    `;
   }
 
   document.getElementById("group").innerHTML =
-    box("HV",HV)+box("LV",LV)+box("ICM",ICM);
 
-  // TOTAL
-  let totalAch=totalTarget?totalRev/totalTarget*100:0;
-  let monthlyTarget=totalTarget/12;
-  let monthlyAch=monthlyTarget?totalRev/monthlyTarget*100:0;
+    groupBox("HV",HV) +
 
-  let gap=Math.max(0, monthlyTarget-totalRev);
+    groupBox("LV",LV) +
+
+    groupBox("ICM",ICM);
+
+  let totalAch = totalTarget
+    ? totalRev/totalTarget*100
+    : 0;
+
+  let monthlyTarget = totalTarget/12;
+
+  let monthlyAch = monthlyTarget
+    ? totalRev/monthlyTarget*100
+    : 0;
+
+  let gap = Math.max(
+    0,
+    monthlyTarget-totalRev
+  );
 
   function need(asp){
-    return asp>0?Math.ceil(gap/asp):0;
+
+    return asp > 0
+      ? Math.ceil(gap/asp)
+      : 0;
   }
 
-  document.getElementById("total").innerHTML=`
+  document.getElementById("total").innerHTML = `
+
   <div class="card">
 
     <div class="big">TOTAL KPI</div>
 
     <div class="highlight">
-      연: <span class="${color(totalAch)}">${totalAch.toFixed(1)}%</span>
-      | 월: <span class="${color(monthlyAch)}">${monthlyAch.toFixed(1)}%</span>
+
+      연:
+      <span class="${color(totalAch)}">
+        ${totalAch.toFixed(1)}%
+      </span>
+
+      |
+
+      월:
+      <span class="${color(monthlyAch)}">
+        ${monthlyAch.toFixed(1)}%
+      </span>
+
     </div>
 
     <br>
 
-    💰 Yearly Target: $${totalTarget.toLocaleString()}<br>
-    💰 누적 매출: $${totalRev.toLocaleString()}<br>
+    💰 목표:
+    $${totalTarget.toLocaleString()}
 
     <br>
 
-    📉 Montly target 대비 부족 매출: <span class="highlight">$${gap.toLocaleString()}</span>
+    💰 누적:
+    $${totalRev.toLocaleString()}
 
     <br><br>
 
-    <b>👉 Monthly target 대비 부족 매출을 한 제품으로 채운다면</b><br>
+    📉  Monthly 부족 매출:
+    <span class="highlight">
+      $${gap.toLocaleString()}
+    </span>
 
-    ICD → ${need(data["ICD"].asp)}개<br>
-    CRT-D → ${need(data["CRT-D"].asp)}개<br>
-    IPG → ${need(data["IPG"].asp)}개<br>
-    CRT-P → ${need(data["CRT-P"].asp)}개<br>
+    <br><br>
 
-    <div class="small">
-    ※ 한 제품 기준 / 월 목표 부족분 기준
-    </div>
+    <b>
+      👉 이번달 목표를
+      한 제품으로 채운다면
+    </b>
+
+    <br>
+
+    ICD →
+    ${need(data["ICD"].asp)}개
+
+    <br>
+
+    CRT-D →
+    ${need(data["CRT-D"].asp)}개
+
+    <br>
+
+    IPG →
+    ${need(data["IPG"].asp)}개
+
+    <br>
+
+    CRT-P →
+    ${need(data["CRT-P"].asp)}개
 
   </div>
+
   `;
+
+  hospitals.forEach((h,i)=>{
+
+    let hospitalRev = 0;
+
+    products.forEach(p=>{
+
+      hospitalRev +=
+
+        Number(h[p.name] || 0)
+
+        *
+
+        safe(p.name+"_asp");
+
+    });
+
+    let contribution = totalRev
+      ? hospitalRev/totalRev*100
+      : 0;
+
+    document.getElementById(
+      "hospital_total_"+i
+    ).innerHTML = `
+
+      💰 누적 병원 매출:
+      $${hospitalRev.toLocaleString()}
+
+      <br>
+
+      📊 전체 매출 기여도:
+      ${contribution.toFixed(1)}%
+
+    `;
+  });
 
   save();
 }
 
 create();
-setInterval(calc,400);
+
+setInterval(calc,500);
 
 </script>
 
